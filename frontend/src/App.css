@@ -194,6 +194,7 @@
 .btn--accent  { background: var(--accent); color: #fff; width: 100%; padding: 13px; font-size: 15px; }
 .btn--sm      { font-size: 12px; padding: 6px 12px; }
 .btn--green   { background: rgba(74, 222, 128, 0.15); color: var(--green); border: 1px solid rgba(74,222,128,0.3); }
+.btn--warning { background: rgba(255,210,63,0.15);    color: var(--accent2); border: 1px solid rgba(255,210,63,0.3); }
 .btn--danger  { background: rgba(248,113,113,0.15);   color: var(--red);   border: 1px solid rgba(248,113,113,0.3); }
 
 /* ── Spinner ─────────────────────────────────────────────── */
@@ -274,6 +275,12 @@
 }
 
 .queue-card:hover { border-color: rgba(255,107,53,0.35); }
+
+.queue-card--suggested {
+  border-color: var(--accent);
+  box-shadow: 0 0 15px rgba(255,107,53,0.2);
+  background: rgba(255,107,53,0.05);
+}
 
 .queue-card__pos {
   font-family: 'Syne', sans-serif;
@@ -404,6 +411,22 @@
 .toast--success span { color: var(--green); font-weight: 700; }
 .toast--error   { border-left: 3px solid var(--red); }
 .toast--error   span { color: var(--red); font-weight: 700; }
+
+/* ── Analytics & Filters ─────────────────────────────────── */
+.filter-input {
+  width: 100%;
+}
+.analytics-container {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+.analytics-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
 
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 600px) {

@@ -23,6 +23,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:password@localho
 class TokenCreate(BaseModel):
     customer_name: str
     phone: str
+    party_size: int = 2
 
     @validator("customer_name")
     def name_not_empty(cls, v):
@@ -43,6 +44,7 @@ class TokenResponse(BaseModel):
     id: int
     customer_name: str
     phone: str
+    party_size: int
     status: str
     created_at: datetime
 
@@ -53,6 +55,7 @@ class QueueEntry(BaseModel):
     token_id: int
     customer_name: str
     phone: str
+    party_size: int
     status: str
 
 class TableResponse(BaseModel):
@@ -91,11 +94,11 @@ async def create_token(token: TokenCreate):
         # Insert token
         row = await conn.fetchrow(
             """
-            INSERT INTO tokens (customer_name, phone, status, created_at)
-            VALUES ($1, $2, 'waiting', NOW())
-            RETURNING id, customer_name, phone, status, created_at
+            INSERT INTO tokens (customer_name, phone, party_size, status, created_at)
+            VALUES ($1, $2, $3, 'waiting', NOW())
+            RETURNING id, customer_name, phone, party_size, status, created_at
             """,
-            token.customer_name, token.phone
+            token.customer_name, token.phone, token.party_size
         )
         token_id = row["id"]
 
@@ -124,7 +127,7 @@ async def get_queue():
         rows = await conn.fetch(
             """
             SELECT q.id AS queue_id, q.position, q.estimated_wait_time,
-                   t.id AS token_id, t.customer_name, t.phone, t.status
+                   t.id AS token_id, t.customer_name, t.phone, t.party_size, t.status
             FROM queue q
             JOIN tokens t ON q.token_id = t.id
             WHERE t.status = 'waiting'
@@ -174,7 +177,7 @@ async def seat_customer(token_id: int):
         row = await conn.fetchrow(
             """
             UPDATE tokens SET status = 'seated'
-            WHERE id = $1 RETURNING id, customer_name, phone, status, created_at
+            WHERE id = $1 RETURNING id, customer_name, phone, party_size, status, created_at
             """,
             token_id
         )
@@ -182,3 +185,91 @@ async def seat_customer(token_id: int):
             raise HTTPException(status_code=404, detail="Token not found")
         await conn.execute("DELETE FROM queue WHERE token_id = $1", token_id)
         return TokenResponse(**dict(row))
+
+@app.patch("/token/{token_id}/cancel", response_model=TokenResponse)
+async def cancel_customer(token_id: int):
+    """Mark a customer as cancelled (removes from queue)."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE tokens SET status = 'cancelled'
+            WHERE id = $1 RETURNING id, customer_name, phone, party_size, status, created_at
+            """,
+            token_id
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Token not found")
+        await conn.execute("DELETE FROM queue WHERE token_id = $1", token_id)
+        # Reorder positions
+        rows = await conn.fetch("SELECT id FROM queue ORDER BY position")
+        for idx, r in enumerate(rows, start=1):
+            await conn.execute(
+                "UPDATE queue SET position = $1, estimated_wait_time = $2 WHERE id = $3",
+                idx, idx * 15, r["id"]
+            )
+        return TokenResponse(**dict(row))
+
+class AnalyticsResponse(BaseModel):
+    total_waiting: int
+    total_seated: int
+    total_cancelled: int
+    total_today: int
+
+@app.get("/analytics", response_model=AnalyticsResponse)
+async def get_analytics():
+    """Get today's analytics."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT status, COUNT(*) as count FROM tokens WHERE DATE(created_at) = CURRENT_DATE GROUP BY status"
+        )
+        stats = {"waiting": 0, "seated": 0, "cancelled": 0}
+        for r in rows:
+            stats[r["status"]] = r["count"]
+        
+        return AnalyticsResponse(
+            total_waiting=stats["waiting"],
+            total_seated=stats["seated"],
+            total_cancelled=stats["cancelled"],
+            total_today=stats["waiting"] + stats["seated"] + stats["cancelled"]
+        )
+
+class SuggestionResponse(BaseModel):
+    table_id: Optional[int] = None
+    table_number: Optional[int] = None
+    token_id: Optional[int] = None
+    customer_name: Optional[str] = None
+    message: str
+
+@app.get("/suggest-seating", response_model=SuggestionResponse)
+async def suggest_seating():
+    """Suggests the best queue entry for the largest available table."""
+    async with pool.acquire() as conn:
+        # Get the largest available table
+        table = await conn.fetchrow(
+            "SELECT id, table_number, capacity FROM tables WHERE status = 'available' ORDER BY capacity DESC LIMIT 1"
+        )
+        if not table:
+            return SuggestionResponse(message="No tables available.")
+            
+        queue_entry = await conn.fetchrow(
+            """
+            SELECT q.token_id, t.customer_name
+            FROM queue q
+            JOIN tokens t ON q.token_id = t.id
+            WHERE t.party_size <= $1
+            ORDER BY q.position ASC
+            LIMIT 1
+            """,
+            table["capacity"]
+        )
+        
+        if not queue_entry:
+            return SuggestionResponse(message=f"No waiting party fits the available table (Capacity: {table['capacity']}).")
+            
+        return SuggestionResponse(
+            table_id=table["id"],
+            table_number=table["table_number"],
+            token_id=queue_entry["token_id"],
+            customer_name=queue_entry["customer_name"],
+            message=f"Suggest seating {queue_entry['customer_name']} at Table {table['table_number']}."
+        )

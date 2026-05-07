@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS tokens (
     id            SERIAL PRIMARY KEY,
     customer_name VARCHAR(100) NOT NULL,
     phone         VARCHAR(20)  NOT NULL,
+    party_size    INT          NOT NULL DEFAULT 2,
     status        VARCHAR(20)  NOT NULL DEFAULT 'waiting'
                   CHECK (status IN ('waiting', 'seated', 'cancelled')),
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
@@ -52,14 +53,14 @@ INSERT INTO tables (table_number, capacity, status) VALUES
 ON CONFLICT DO NOTHING;
 
 -- Waiting customers (tokens)
-INSERT INTO tokens (customer_name, phone, status, created_at) VALUES
-    ('Arjun Sharma',   '+91-9876543210', 'waiting',  NOW() - INTERVAL '30 minutes'),
-    ('Priya Nair',     '+91-9123456780', 'waiting',  NOW() - INTERVAL '22 minutes'),
-    ('Rahul Verma',    '+91-9988776655', 'waiting',  NOW() - INTERVAL '15 minutes'),
-    ('Sneha Pillai',   '+91-9345678901', 'waiting',  NOW() - INTERVAL '10 minutes'),
-    ('Karthik Menon',  '+91-9012345678', 'waiting',  NOW() - INTERVAL '5 minutes'),
-    ('Divya Krishnan', '+91-9765432109', 'seated',   NOW() - INTERVAL '45 minutes'),
-    ('Amit Patel',     '+91-9654321098', 'seated',   NOW() - INTERVAL '50 minutes')
+INSERT INTO tokens (customer_name, phone, party_size, status, created_at) VALUES
+    ('Arjun Sharma',   '+91-9876543210', 2, 'waiting',  NOW() - INTERVAL '30 minutes'),
+    ('Priya Nair',     '+91-9123456780', 4, 'waiting',  NOW() - INTERVAL '22 minutes'),
+    ('Rahul Verma',    '+91-9988776655', 2, 'waiting',  NOW() - INTERVAL '15 minutes'),
+    ('Sneha Pillai',   '+91-9345678901', 6, 'waiting',  NOW() - INTERVAL '10 minutes'),
+    ('Karthik Menon',  '+91-9012345678', 3, 'waiting',  NOW() - INTERVAL '5 minutes'),
+    ('Divya Krishnan', '+91-9765432109', 2, 'seated',   NOW() - INTERVAL '45 minutes'),
+    ('Amit Patel',     '+91-9654321098', 4, 'seated',   NOW() - INTERVAL '50 minutes')
 ON CONFLICT DO NOTHING;
 
 -- Queue entries (only for 'waiting' tokens)

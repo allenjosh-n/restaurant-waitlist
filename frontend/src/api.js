@@ -5,4 +5,7 @@ export const getQueue     = ()     => api.get('/queue');
 export const getTables    = ()     => api.get('/tables');
 export const deleteToken  = (id)   => api.delete(`/token/${id}`);
 export const seatCustomer = (id)   => api.patch(`/token/${id}/seat`);
+export const cancelToken  = (id)   => api.patch(`/token/${id}/cancel`);
+export const getAnalytics   = ()   => api.get('/analytics');
+export const suggestSeating = ()   => api.get('/suggest-seating');
 export default api;

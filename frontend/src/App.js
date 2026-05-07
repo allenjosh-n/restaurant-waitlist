@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { createToken, getQueue, getTables, deleteToken, seatCustomer } from './api';
+import { createToken, getQueue, getTables, deleteToken, seatCustomer, cancelToken, getAnalytics, suggestSeating } from './api';
 import './App.css';
 
 // ── Toast ────────────────────────────────────────────────────────────────────
@@ -18,7 +18,7 @@ function Toast({ message, type, onClose }) {
 
 // ── Add Token Form ────────────────────────────────────────────────────────────
 function AddTokenForm({ onSuccess, onError }) {
-  const [form, setForm]     = useState({ customer_name: '', phone: '' });
+  const [form, setForm]     = useState({ customer_name: '', phone: '', party_size: 2 });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -29,6 +29,8 @@ function AddTokenForm({ onSuccess, onError }) {
     const digits = form.phone.replace(/\D/g, '');
     if (digits.length < 10)
       e.phone = 'Enter a valid 10-digit phone number';
+    if (form.party_size < 1)
+      e.party_size = 'Party size must be at least 1';
     return e;
   };
 
@@ -40,7 +42,7 @@ function AddTokenForm({ onSuccess, onError }) {
     setLoading(true);
     try {
       await createToken(form);
-      setForm({ customer_name: '', phone: '' });
+      setForm({ customer_name: '', phone: '', party_size: 2 });
       onSuccess('Token created! Customer added to queue.');
     } catch (err) {
       const msg = err.response?.data?.detail || 'Failed to create token';
@@ -78,6 +80,19 @@ function AddTokenForm({ onSuccess, onError }) {
         {errors.phone && <span className="field__error">{errors.phone}</span>}
       </div>
 
+      <div className="field">
+        <label className="field__label">Party Size</label>
+        <input
+          className={`field__input ${errors.party_size ? 'field__input--error' : ''}`}
+          type="number"
+          min="1"
+          max="20"
+          value={form.party_size}
+          onChange={e => setForm(f => ({ ...f, party_size: parseInt(e.target.value) || 1 }))}
+        />
+        {errors.party_size && <span className="field__error">{errors.party_size}</span>}
+      </div>
+
       <button className="btn btn--accent" type="submit" disabled={loading}>
         {loading ? <span className="spinner" /> : '+ Add Customer'}
       </button>
@@ -86,7 +101,9 @@ function AddTokenForm({ onSuccess, onError }) {
 }
 
 // ── Queue List ────────────────────────────────────────────────────────────────
-function QueueList({ queue, loading, onDelete, onSeat }) {
+function QueueList({ queue, loading, onDelete, onSeat, onCancel, suggestedTokenId }) {
+  const [filterQuery, setFilterQuery] = useState('');
+
   if (loading) return <div className="loading-state">Loading queue…</div>;
   if (!queue.length) return (
     <div className="empty-state">
@@ -95,28 +112,48 @@ function QueueList({ queue, loading, onDelete, onSeat }) {
     </div>
   );
 
+  const filteredQueue = queue.filter(q => 
+    q.customer_name.toLowerCase().includes(filterQuery.toLowerCase()) || 
+    q.phone.includes(filterQuery) ||
+    q.party_size.toString() === filterQuery
+  );
+
   return (
-    <div className="queue-list">
-      {queue.map((entry) => (
-        <div key={entry.queue_id} className="queue-card">
-          <div className="queue-card__pos">#{entry.position}</div>
-          <div className="queue-card__info">
-            <span className="queue-card__name">{entry.customer_name}</span>
-            <span className="queue-card__phone">{entry.phone}</span>
+    <div className="queue-container">
+      <div className="filters" style={{marginBottom: '1rem'}}>
+        <input 
+          type="text" 
+          placeholder="Filter by name, phone, or party size..." 
+          className="field__input filter-input"
+          value={filterQuery}
+          onChange={e => setFilterQuery(e.target.value)}
+        />
+      </div>
+      <div className="queue-list">
+        {filteredQueue.length === 0 ? <p className="empty-state">No matches found.</p> : filteredQueue.map((entry) => (
+          <div key={entry.queue_id} className={`queue-card ${suggestedTokenId === entry.token_id ? 'queue-card--suggested' : ''}`}>
+            <div className="queue-card__pos">#{entry.position}</div>
+            <div className="queue-card__info">
+              <span className="queue-card__name">{entry.customer_name}</span>
+              <span className="queue-card__phone">{entry.phone} &bull; Party of {entry.party_size}</span>
+            </div>
+            <div className="queue-card__wait">
+              <span className="wait-label">~{entry.estimated_wait_time} min</span>
+            </div>
+            <div className="queue-card__actions">
+              <button className="btn btn--sm btn--green" onClick={() => onSeat(entry.token_id)}>
+                Seat
+              </button>
+              <button className="btn btn--sm btn--warning" onClick={() => onCancel(entry.token_id)}>
+                No-Show
+              </button>
+              <button className="btn btn--sm btn--danger" onClick={() => onDelete(entry.token_id)}>
+                Del
+              </button>
+            </div>
           </div>
-          <div className="queue-card__wait">
-            <span className="wait-label">~{entry.estimated_wait_time} min</span>
-          </div>
-          <div className="queue-card__actions">
-            <button className="btn btn--sm btn--green" onClick={() => onSeat(entry.token_id)}>
-              Seat
-            </button>
-            <button className="btn btn--sm btn--danger" onClick={() => onDelete(entry.token_id)}>
-              Remove
-            </button>
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -139,6 +176,36 @@ function TablesGrid({ tables, loading }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ── Analytics Tab ─────────────────────────────────────────────────────────────
+function AnalyticsTab({ loading, analytics }) {
+  if (loading) return <div className="loading-state">Loading analytics…</div>;
+  if (!analytics) return <div className="empty-state">No analytics available.</div>;
+
+  return (
+    <div className="analytics-container">
+      <h2 className="analytics-title" style={{marginBottom: '1rem'}}>Today's Overview</h2>
+      <div className="analytics-grid" style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem'}}>
+        <div className="analytics-card stat-card">
+          <h3>Total Customers</h3>
+          <p className="analytics-val stat__value">{analytics.total_today}</p>
+        </div>
+        <div className="analytics-card stat-card">
+          <h3>Waiting</h3>
+          <p className="analytics-val stat__value">{analytics.total_waiting}</p>
+        </div>
+        <div className="analytics-card stat-card">
+          <h3>Seated</h3>
+          <p className="analytics-val stat__value stat__value--green">{analytics.total_seated}</p>
+        </div>
+        <div className="analytics-card stat-card">
+          <h3>No-Shows</h3>
+          <p className="analytics-val stat__value stat__value--red">{analytics.total_cancelled}</p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -175,10 +242,13 @@ function StatsBar({ queue, tables }) {
 export default function App() {
   const [queue,      setQueue]      = useState([]);
   const [tables,     setTables]     = useState([]);
+  const [analytics,  setAnalytics]  = useState(null);
   const [qLoading,   setQLoading]   = useState(true);
   const [tLoading,   setTLoading]   = useState(true);
+  const [aLoading,   setALoading]   = useState(true);
   const [toast,      setToast]      = useState(null);
   const [activeTab,  setActiveTab]  = useState('queue');
+  const [suggestedTokenId, setSuggestedTokenId] = useState(null);
 
   const showToast = (message, type = 'success') => setToast({ message, type });
 
@@ -200,12 +270,22 @@ export default function App() {
     finally { setTLoading(false); }
   }, []);
 
+  const fetchAnalytics = useCallback(async () => {
+    setALoading(true);
+    try {
+      const { data } = await getAnalytics();
+      setAnalytics(data);
+    } catch { console.error('Could not load analytics'); }
+    finally { setALoading(false); }
+  }, []);
+
   useEffect(() => {
     fetchQueue();
     fetchTables();
-    const interval = setInterval(() => { fetchQueue(); fetchTables(); }, 15000);
+    fetchAnalytics();
+    const interval = setInterval(() => { fetchQueue(); fetchTables(); fetchAnalytics(); }, 15000);
     return () => clearInterval(interval);
-  }, [fetchQueue, fetchTables]);
+  }, [fetchQueue, fetchTables, fetchAnalytics]);
 
   const handleDelete = async (id) => {
     try {
@@ -221,7 +301,32 @@ export default function App() {
       showToast('Customer seated! 🎉');
       fetchQueue();
       fetchTables();
+      fetchAnalytics();
+      if (suggestedTokenId === id) setSuggestedTokenId(null);
     } catch { showToast('Failed to seat customer', 'error'); }
+  };
+
+  const handleCancel = async (id) => {
+    try {
+      await cancelToken(id);
+      showToast('Customer marked as no-show');
+      fetchQueue();
+      fetchAnalytics();
+      if (suggestedTokenId === id) setSuggestedTokenId(null);
+    } catch { showToast('Failed to cancel customer', 'error'); }
+  };
+
+  const handleSuggest = async () => {
+    try {
+      const { data } = await suggestSeating();
+      if (data.token_id) {
+        setSuggestedTokenId(data.token_id);
+        setActiveTab('queue');
+        showToast(data.message, 'success');
+      } else {
+        showToast(data.message, 'error');
+      }
+    } catch { showToast('Error suggesting seating', 'error'); }
   };
 
   const handleTokenAdded = (msg) => {
@@ -269,17 +374,32 @@ export default function App() {
           >
             Tables
           </button>
+          <button
+            className={`tab ${activeTab === 'analytics' ? 'tab--active' : ''}`}
+            onClick={() => setActiveTab('analytics')}
+          >
+            Analytics
+          </button>
         </div>
 
         {activeTab === 'queue' ? (
-          <QueueList
-            queue={queue}
-            loading={qLoading}
-            onDelete={handleDelete}
-            onSeat={handleSeat}
-          />
-        ) : (
+          <div className="queue-wrapper">
+             <div className="queue-actions" style={{marginBottom: '1rem', display: 'flex', justifyContent: 'flex-end'}}>
+               <button className="btn btn--accent" onClick={handleSuggest}>✨ Suggest Seating</button>
+             </div>
+            <QueueList
+              queue={queue}
+              loading={qLoading}
+              onDelete={handleDelete}
+              onSeat={handleSeat}
+              onCancel={handleCancel}
+              suggestedTokenId={suggestedTokenId}
+            />
+          </div>
+        ) : activeTab === 'tables' ? (
           <TablesGrid tables={tables} loading={tLoading} />
+        ) : (
+          <AnalyticsTab analytics={analytics} loading={aLoading} />
         )}
       </main>
 

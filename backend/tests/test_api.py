@@ -13,10 +13,10 @@ from main import app
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def make_token_row(id=1, name="Test User", phone="9876543210",
-                   status="waiting"):
+                   status="waiting", party_size=2):
     from datetime import datetime
     row = {
-        "id": id, "customer_name": name, "phone": phone,
+        "id": id, "customer_name": name, "phone": phone, "party_size": party_size,
         "status": status, "created_at": datetime.utcnow()
     }
     return MagicMock(**row, **{"__getitem__": lambda s, k: row[k],
@@ -25,11 +25,11 @@ def make_token_row(id=1, name="Test User", phone="9876543210",
 
 
 def make_queue_row(queue_id=1, position=1, wait=15,
-                   token_id=1, name="Test User", phone="9876543210"):
+                   token_id=1, name="Test User", phone="9876543210", party_size=2):
     row = {
         "queue_id": queue_id, "position": position,
         "estimated_wait_time": wait, "token_id": token_id,
-        "customer_name": name, "phone": phone, "status": "waiting"
+        "customer_name": name, "phone": phone, "party_size": party_size, "status": "waiting"
     }
     return MagicMock(**row, **{"__getitem__": lambda s, k: row[k],
                                "items": lambda s: row.items(),
@@ -175,7 +175,7 @@ class TestGetQueue:
                 res = await client.get("/queue")
         entry = res.json()[0]
         for field in ("queue_id", "position", "estimated_wait_time",
-                      "token_id", "customer_name", "phone", "status"):
+                      "token_id", "customer_name", "phone", "party_size", "status"):
             assert field in entry
 
 
@@ -258,3 +258,63 @@ class TestSeatCustomer:
                                    base_url="http://test") as client:
                 res = await client.patch("/token/999/seat")
         assert res.status_code == 404
+
+# ── Tests: PATCH /token/{id}/cancel ──────────────────────────────────────────
+
+class TestCancelCustomer:
+
+    @pytest.mark.asyncio
+    async def test_cancel_customer_success(self, mock_pool, mock_conn):
+        mock_conn.fetchrow = AsyncMock(
+            return_value=make_token_row(status="cancelled"))
+        mock_conn.execute  = AsyncMock()
+        mock_conn.fetch = AsyncMock(return_value=[])
+        with patch("main.pool", mock_pool):
+            async with AsyncClient(transport=ASGITransport(app=app),
+                                   base_url="http://test") as client:
+                res = await client.patch("/token/1/cancel")
+        assert res.status_code == 200
+        assert res.json()["status"] == "cancelled"
+
+
+# ── Tests: GET /analytics ────────────────────────────────────────────────────
+
+class TestGetAnalytics:
+
+    @pytest.mark.asyncio
+    async def test_get_analytics(self, mock_pool, mock_conn):
+        mock_conn.fetch = AsyncMock(return_value=[
+            {"status": "waiting", "count": 2},
+            {"status": "seated", "count": 1}
+        ])
+        with patch("main.pool", mock_pool):
+            async with AsyncClient(transport=ASGITransport(app=app),
+                                   base_url="http://test") as client:
+                res = await client.get("/analytics")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["total_waiting"] == 2
+        assert data["total_seated"] == 1
+        assert data["total_cancelled"] == 0
+        assert data["total_today"] == 3
+
+
+# ── Tests: GET /suggest-seating ──────────────────────────────────────────────
+
+class TestSuggestSeating:
+
+    @pytest.mark.asyncio
+    async def test_suggest_seating_success(self, mock_pool, mock_conn):
+        mock_conn.fetchrow = AsyncMock(side_effect=[
+            {"id": 1, "table_number": 5, "capacity": 4},
+            {"token_id": 2, "customer_name": "Test Party"}
+        ])
+        with patch("main.pool", mock_pool):
+            async with AsyncClient(transport=ASGITransport(app=app),
+                                   base_url="http://test") as client:
+                res = await client.get("/suggest-seating")
+        assert res.status_code == 200
+        data = res.json()
+        assert data["table_number"] == 5
+        assert data["customer_name"] == "Test Party"
+
