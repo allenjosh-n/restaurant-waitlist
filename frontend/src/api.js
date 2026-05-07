@@ -1,5 +1,11 @@
 import axios from 'axios';
-const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
+const BASE_URL = process.env.REACT_APP_API_URL
+  ? process.env.REACT_APP_API_URL
+  : window.location.hostname === 'localhost'
+    ? 'http://localhost:8000'
+    : 'https://restaurant-waitlist-nv21.onrender.com';
+
 const api = axios.create({ baseURL: BASE_URL });
 export const createToken    = (data) => api.post('/token', data);
 export const getQueue       = ()     => api.get('/queue');
