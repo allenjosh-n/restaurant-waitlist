@@ -318,3 +318,102 @@ class TestSuggestSeating:
         assert data["table_number"] == 5
         assert data["customer_name"] == "Test Party"
 
+
+
+# ── Week 3 Tests ──────────────────────────────────────────────────────────────
+
+def make_history_row(id=1, name="Test User", phone="9876543210",
+                     party_size=2, status="seated"):
+    from datetime import datetime
+    row = {
+        "id": id, "customer_name": name, "phone": phone,
+        "party_size": party_size, "status": status,
+        "created_at": datetime.utcnow()
+    }
+    return MagicMock(**row, **{"__getitem__": lambda s, k: row[k],
+                               "items": lambda s: row.items(),
+                               "keys": lambda s: row.keys()})
+
+
+class TestGetHistory:
+
+    @pytest.mark.asyncio
+    async def test_history_returns_list(self, mock_pool, mock_conn):
+        mock_conn.fetch = AsyncMock(return_value=[
+            make_history_row(id=1, name="Divya", status="seated"),
+            make_history_row(id=2, name="Amit",  status="cancelled"),
+        ])
+        with patch("main.pool", mock_pool):
+            async with AsyncClient(transport=ASGITransport(app=app),
+                                   base_url="http://test") as client:
+                res = await client.get("/history")
+        assert res.status_code == 200
+        data = res.json()
+        assert isinstance(data, list)
+        assert len(data) == 2
+
+    @pytest.mark.asyncio
+    async def test_history_empty(self, mock_pool, mock_conn):
+        mock_conn.fetch = AsyncMock(return_value=[])
+        with patch("main.pool", mock_pool):
+            async with AsyncClient(transport=ASGITransport(app=app),
+                                   base_url="http://test") as client:
+                res = await client.get("/history")
+        assert res.status_code == 200
+        assert res.json() == []
+
+    @pytest.mark.asyncio
+    async def test_history_fields_present(self, mock_pool, mock_conn):
+        mock_conn.fetch = AsyncMock(return_value=[make_history_row()])
+        with patch("main.pool", mock_pool):
+            async with AsyncClient(transport=ASGITransport(app=app),
+                                   base_url="http://test") as client:
+                res = await client.get("/history")
+        entry = res.json()[0]
+        for field in ("id", "customer_name", "phone", "party_size", "status", "created_at"):
+            assert field in entry
+
+    @pytest.mark.asyncio
+    async def test_history_only_seated_and_cancelled(self, mock_pool, mock_conn):
+        mock_conn.fetch = AsyncMock(return_value=[
+            make_history_row(status="seated"),
+            make_history_row(status="cancelled"),
+        ])
+        with patch("main.pool", mock_pool):
+            async with AsyncClient(transport=ASGITransport(app=app),
+                                   base_url="http://test") as client:
+                res = await client.get("/history")
+        data = res.json()
+        for entry in data:
+            assert entry["status"] in ("seated", "cancelled")
+
+
+class TestExportCSV:
+
+    @pytest.mark.asyncio
+    async def test_export_csv_returns_file(self, mock_pool, mock_conn):
+        from datetime import datetime
+        row = MagicMock()
+        row.__getitem__ = lambda s, k: {
+            "id": 1, "customer_name": "Arjun", "phone": "9876543210",
+            "party_size": 2, "status": "seated",
+            "created_at": "2024-01-01 12:00:00"
+        }[k]
+        mock_conn.fetch = AsyncMock(return_value=[row])
+        with patch("main.pool", mock_pool):
+            async with AsyncClient(transport=ASGITransport(app=app),
+                                   base_url="http://test") as client:
+                res = await client.get("/export/csv")
+        assert res.status_code == 200
+        assert "text/csv" in res.headers["content-type"]
+        assert "attachment" in res.headers["content-disposition"]
+
+    @pytest.mark.asyncio
+    async def test_export_csv_empty(self, mock_pool, mock_conn):
+        mock_conn.fetch = AsyncMock(return_value=[])
+        with patch("main.pool", mock_pool):
+            async with AsyncClient(transport=ASGITransport(app=app),
+                                   base_url="http://test") as client:
+                res = await client.get("/export/csv")
+        assert res.status_code == 200
+        assert "Token ID" in res.text  # header row always present

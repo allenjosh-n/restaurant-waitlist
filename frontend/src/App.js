@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { createToken, getQueue, getTables, deleteToken, seatCustomer, cancelToken, getAnalytics, suggestSeating } from './api';
+import { createToken, getQueue, getTables, deleteToken, seatCustomer, cancelToken, getAnalytics, suggestSeating, getHistory, exportCSV } from './api';
 import './App.css';
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -22,6 +22,7 @@ function Sidebar({ activeTab, setActiveTab, queueCount }) {
     { id: 'queue',     icon: '🎫', label: 'Queue',     badge: queueCount },
     { id: 'tables',    icon: '🪑', label: 'Tables',    badge: null },
     { id: 'analytics', icon: '📊', label: 'Analytics', badge: null },
+    { id: 'history',   icon: '📋', label: 'History',   badge: null },
   ];
 
   return (
@@ -348,6 +349,87 @@ function AnalyticsTab({ loading, analytics }) {
   );
 }
 
+// ── History Tab ───────────────────────────────────────────────────────────────
+function HistoryTab() {
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getHistory()
+      .then(({ data }) => setHistory(data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const statusColor = { seated: 'var(--green)', cancelled: 'var(--red)' };
+  const statusBg    = { seated: 'var(--green-light)', cancelled: 'var(--red-light)' };
+  const statusIcon  = { seated: '✅', cancelled: '❌' };
+
+  const handleExport = () => {
+    window.open(exportCSV(), '_blank');
+  };
+
+  if (loading) return <div className="loading-state">Loading history…</div>;
+
+  return (
+    <div className="card">
+      <div className="card__header">
+        <span className="card__title">📋 Today's History</span>
+        <button className="btn btn--outline btn--sm" onClick={handleExport}>
+          ⬇ Export CSV
+        </button>
+      </div>
+
+      {history.length === 0 ? (
+        <div className="empty-state">
+          <span className="empty-state__icon">📭</span>
+          <p>No completed entries yet today.</p>
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+                {['#', 'Customer', 'Phone', 'Party', 'Status', 'Time'].map(h => (
+                  <th key={h} style={{ padding: '10px 20px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((entry, i) => (
+                <tr key={entry.id} style={{ borderBottom: '1px solid var(--border-light)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <td style={{ padding: '12px 20px', color: 'var(--text-secondary)', fontWeight: 600 }}>{i + 1}</td>
+                  <td style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text)' }}>{entry.customer_name}</td>
+                  <td style={{ padding: '12px 20px', color: 'var(--text-secondary)' }}>{entry.phone}</td>
+                  <td style={{ padding: '12px 20px', color: 'var(--text-secondary)' }}>{entry.party_size}</td>
+                  <td style={{ padding: '12px 20px' }}>
+                    <span style={{
+                      background: statusBg[entry.status],
+                      color: statusColor[entry.status],
+                      padding: '3px 10px',
+                      borderRadius: '20px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      textTransform: 'capitalize'
+                    }}>
+                      {statusIcon[entry.status]} {entry.status}
+                    </span>
+                  </td>
+                  <td style={{ padding: '12px 20px', color: 'var(--text-secondary)' }}>
+                    {new Date(entry.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
   const [queue,      setQueue]      = useState([]);
@@ -432,6 +514,7 @@ export default function App() {
     queue:     { title: 'Live Queue', subtitle: 'Manage walk-in customers in real time' },
     tables:    { title: 'Table Status', subtitle: 'View and monitor dining table availability' },
     analytics: { title: 'Analytics', subtitle: "Today's performance overview" },
+    history:   { title: 'History', subtitle: "Today's seated and cancelled customers" },
   };
 
   return (
@@ -476,6 +559,10 @@ export default function App() {
 
           {activeTab === 'analytics' && (
             <AnalyticsTab analytics={analytics} loading={aLoading} />
+          )}
+
+          {activeTab === 'history' && (
+            <HistoryTab />
           )}
         </div>
       </div>

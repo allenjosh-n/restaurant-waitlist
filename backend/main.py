@@ -1,10 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, validator
 from typing import Optional, List
 from datetime import datetime
 import asyncpg
 import os
+import csv
+import io
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -276,3 +279,61 @@ async def suggest_seating():
             customer_name=queue_entry["customer_name"],
             message=f"Suggest seating {queue_entry['customer_name']} at Table {table['table_number']}."
         )
+
+
+# ── Week 3: History ──────────────────────────────────────────────────────────
+
+class HistoryEntry(BaseModel):
+    id: int
+    customer_name: str
+    phone: str
+    party_size: int
+    status: str
+    created_at: datetime
+
+@app.get("/history", response_model=List[HistoryEntry])
+async def get_history():
+    """Get today's seated and cancelled customers (history log)."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT id, customer_name, phone, party_size, status, created_at
+            FROM tokens
+            WHERE status IN ('seated', 'cancelled')
+              AND DATE(created_at) = CURRENT_DATE
+            ORDER BY created_at DESC
+            """
+        )
+        return [HistoryEntry(**dict(r)) for r in rows]
+
+
+# ── Week 3: CSV Export ───────────────────────────────────────────────────────
+
+@app.get("/export/csv")
+async def export_csv():
+    """Export today's full token history as a CSV file."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT id, customer_name, phone, party_size, status,
+                   TO_CHAR(created_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD HH24:MI:SS') AS created_at
+            FROM tokens
+            WHERE DATE(created_at) = CURRENT_DATE
+            ORDER BY created_at ASC
+            """
+        )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Token ID", "Customer Name", "Phone", "Party Size", "Status", "Created At (IST)"])
+    for r in rows:
+        writer.writerow([r["id"], r["customer_name"], r["phone"],
+                         r["party_size"], r["status"], r["created_at"]])
+
+    output.seek(0)
+    filename = f"waitlist_{datetime.now().strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
