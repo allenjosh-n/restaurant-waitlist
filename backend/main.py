@@ -19,6 +19,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "https://restaurant-waitlist-nv21.onrender.com",
+        "https://restaurant-waitlist-iota.vercel.app",
         "https://*.vercel.app",
     ],
     allow_credentials=True,
