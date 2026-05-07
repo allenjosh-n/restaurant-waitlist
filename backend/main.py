@@ -5,6 +5,9 @@ from typing import Optional, List
 from datetime import datetime
 import asyncpg
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI(title="Restaurant Waitlist API", version="1.0.0")
 
@@ -74,7 +77,7 @@ pool = None
 @app.on_event("startup")
 async def startup():
     global pool
-    pool = await asyncpg.create_pool(DATABASE_URL)
+    pool = await asyncpg.create_pool(DATABASE_URL, ssl="require")
 
 @app.on_event("shutdown")
 async def shutdown():
