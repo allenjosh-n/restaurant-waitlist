@@ -18,7 +18,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://restaurant-waitlist.vercel.app",
+        "https://restaurant-waitlist-nv21.onrender.com",
         "https://*.vercel.app",
     ],
     allow_credentials=True,
