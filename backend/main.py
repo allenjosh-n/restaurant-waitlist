@@ -16,13 +16,8 @@ app = FastAPI(title="Restaurant Waitlist API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://restaurant-waitlist-nv21.onrender.com",
-        "https://restaurant-waitlist-iota.vercel.app",
-        "https://*.vercel.app",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
