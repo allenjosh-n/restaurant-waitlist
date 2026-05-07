@@ -80,12 +80,9 @@ pool = None
 @app.on_event("startup")
 async def startup():
     global pool
-    # Use ssl="require" for direct connections, disable for pooler (SSL in URL)
     db_url = DATABASE_URL
-    if "pooler.supabase.com" in db_url:
-        pool = await asyncpg.create_pool(db_url)
-    else:
-        pool = await asyncpg.create_pool(db_url, ssl="require")
+    # Supabase pooler requires statement_cache_size=0
+    pool = await asyncpg.create_pool(db_url, statement_cache_size=0)
 
 @app.on_event("shutdown")
 async def shutdown():
