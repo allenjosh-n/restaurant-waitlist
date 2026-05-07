@@ -1,5 +1,6 @@
 import axios from 'axios';
-const api = axios.create({ baseURL: 'http://localhost:8000' });
+const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const api = axios.create({ baseURL: BASE_URL });
 export const createToken    = (data) => api.post('/token', data);
 export const getQueue       = ()     => api.get('/queue');
 export const getTables      = ()     => api.get('/tables');
@@ -9,5 +10,5 @@ export const cancelToken    = (id)   => api.patch(`/token/${id}/cancel`);
 export const getAnalytics   = ()     => api.get('/analytics');
 export const suggestSeating = ()     => api.get('/suggest-seating');
 export const getHistory     = ()     => api.get('/history');
-export const exportCSV      = ()     => `http://localhost:8000/export/csv`;
+export const exportCSV      = ()     => `${BASE_URL}/export/csv`;
 export default api;
