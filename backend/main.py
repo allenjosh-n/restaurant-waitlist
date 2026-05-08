@@ -310,7 +310,7 @@ async def get_analytics():
     """Get today's analytics."""
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT status, COUNT(*) as count FROM tokens WHERE DATE(created_at) = CURRENT_DATE GROUP BY status"
+            "SELECT status, COUNT(*) as count FROM tokens WHERE DATE(created_at AT TIME ZONE 'Asia/Kolkata') = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date GROUP BY status"
         )
         stats = {"waiting": 0, "seated": 0, "cancelled": 0}
         for r in rows:
@@ -377,7 +377,7 @@ class HistoryEntry(BaseModel):
 
 @app.get("/history", response_model=List[HistoryEntry])
 async def get_history(date: Optional[str] = None):
-    """Get seated and cancelled customers for a given date (defaults to today)."""
+    """Get seated and cancelled customers for a given date (defaults to today, IST timezone)."""
     async with pool.acquire() as conn:
         if date:
             rows = await conn.fetch(
@@ -385,7 +385,7 @@ async def get_history(date: Optional[str] = None):
                 SELECT id, customer_name, phone, party_size, status, created_at
                 FROM tokens
                 WHERE status IN ('seated', 'cancelled')
-                  AND DATE(created_at) = $1::date
+                  AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') = $1::date
                 ORDER BY created_at DESC
                 """,
                 date
@@ -396,7 +396,7 @@ async def get_history(date: Optional[str] = None):
                 SELECT id, customer_name, phone, party_size, status, created_at
                 FROM tokens
                 WHERE status IN ('seated', 'cancelled')
-                  AND DATE(created_at) = CURRENT_DATE
+                  AND DATE(created_at AT TIME ZONE 'Asia/Kolkata') = CURRENT_DATE AT TIME ZONE 'Asia/Kolkata'
                 ORDER BY created_at DESC
                 """
             )
