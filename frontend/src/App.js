@@ -377,6 +377,7 @@ function AnalyticsTab({ loading, analytics }) {
 function HistoryTab() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
 
   useEffect(() => {
     getHistory()
@@ -391,6 +392,20 @@ function HistoryTab() {
 
   const handleExport = () => window.open(exportCSV(), '_blank');
 
+  const filtered = filter === 'all' ? history : history.filter(e => e.status === filter);
+
+  const counts = {
+    all:       history.length,
+    seated:    history.filter(e => e.status === 'seated').length,
+    cancelled: history.filter(e => e.status === 'cancelled').length,
+  };
+
+  const filterBtns = [
+    { key: 'all',       label: `All (${counts.all})` },
+    { key: 'seated',    label: `✅ Seated (${counts.seated})` },
+    { key: 'cancelled', label: `❌ No-Show (${counts.cancelled})` },
+  ];
+
   return (
     <div className="card">
       <div className="card__header">
@@ -400,12 +415,36 @@ function HistoryTab() {
         </button>
       </div>
 
+      {/* Filter Buttons */}
+      <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-light)', display: 'flex', gap: '8px' }}>
+        {filterBtns.map(btn => (
+          <button
+            key={btn.key}
+            onClick={() => setFilter(btn.key)}
+            style={{
+              padding: '5px 14px',
+              borderRadius: '20px',
+              border: '1.5px solid',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+              borderColor: filter === btn.key ? 'var(--accent)' : 'var(--border)',
+              background: filter === btn.key ? 'var(--accent-light)' : 'transparent',
+              color: filter === btn.key ? 'var(--accent)' : 'var(--text-secondary)',
+            }}
+          >
+            {btn.label}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div className="loading-state">Loading history…</div>
-      ) : history.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="empty-state">
           <span className="empty-state__icon">📭</span>
-          <p>No completed entries yet today.</p>
+          <p>{filter === 'all' ? 'No completed entries yet today.' : `No ${filter} entries today.`}</p>
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -418,7 +457,7 @@ function HistoryTab() {
               </tr>
             </thead>
             <tbody>
-              {history.map((entry, i) => (
+              {filtered.map((entry, i) => (
                 <tr key={entry.id} style={{ borderBottom: '1px solid var(--border-light)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
@@ -433,7 +472,7 @@ function HistoryTab() {
                       padding: '3px 10px', borderRadius: '20px',
                       fontSize: '11px', fontWeight: 600, textTransform: 'capitalize'
                     }}>
-                      {statusIcon[entry.status]} {entry.status}
+                      {statusIcon[entry.status]} {entry.status === 'cancelled' ? 'No-Show' : entry.status}
                     </span>
                   </td>
                   <td style={{ padding: '12px 20px', color: 'var(--text-secondary)' }}>
