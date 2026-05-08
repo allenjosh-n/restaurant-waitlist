@@ -374,47 +374,30 @@ function AnalyticsTab({ loading, analytics }) {
 }
 
 // ── History Tab ───────────────────────────────────────────────────────────────
-function HistoryTab({ selectedDate, onDateChange }) {
+function HistoryTab() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
-    getHistory(selectedDate)
+    getHistory()
       .then(({ data }) => setHistory(data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [selectedDate]);
+  }, []);
 
   const statusColor = { seated: 'var(--green)', cancelled: 'var(--red)' };
   const statusBg    = { seated: 'var(--green-light)', cancelled: 'var(--red-light)' };
   const statusIcon  = { seated: '✅', cancelled: '❌' };
 
-  const handleExport = () => {
-    window.open(exportCSV(selectedDate), '_blank');
-  };
-
-  const displayDate = selectedDate
-    ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-    : new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const handleExport = () => window.open(exportCSV(), '_blank');
 
   return (
     <div className="card">
       <div className="card__header">
-        <span className="card__title">📋 History — {displayDate}</span>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <input
-            type="date"
-            className="field__input"
-            style={{ padding: '5px 10px', fontSize: '13px', width: 'auto' }}
-            value={selectedDate || new Date().toISOString().split('T')[0]}
-            max={new Date().toISOString().split('T')[0]}
-            onChange={e => onDateChange(e.target.value)}
-          />
-          <button className="btn btn--outline btn--sm" onClick={handleExport}>
-            ⬇ Export CSV
-          </button>
-        </div>
+        <span className="card__title">📋 Today's History</span>
+        <button className="btn btn--outline btn--sm" onClick={handleExport}>
+          ⬇ Export CSV
+        </button>
       </div>
 
       {loading ? (
@@ -422,14 +405,14 @@ function HistoryTab({ selectedDate, onDateChange }) {
       ) : history.length === 0 ? (
         <div className="empty-state">
           <span className="empty-state__icon">📭</span>
-          <p>No entries found for this date.</p>
+          <p>No completed entries yet today.</p>
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
-                {['#', 'Customer', 'Phone', 'Party', 'Status', 'Time'].map(h => (
+                {['#', 'Customer', 'Phone', 'Party', 'Status', 'Time (IST)'].map(h => (
                   <th key={h} style={{ padding: '10px 20px', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
                 ))}
               </tr>
@@ -447,17 +430,16 @@ function HistoryTab({ selectedDate, onDateChange }) {
                     <span style={{
                       background: statusBg[entry.status],
                       color: statusColor[entry.status],
-                      padding: '3px 10px',
-                      borderRadius: '20px',
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      textTransform: 'capitalize'
+                      padding: '3px 10px', borderRadius: '20px',
+                      fontSize: '11px', fontWeight: 600, textTransform: 'capitalize'
                     }}>
                       {statusIcon[entry.status]} {entry.status}
                     </span>
                   </td>
                   <td style={{ padding: '12px 20px', color: 'var(--text-secondary)' }}>
-                    {new Date(entry.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    {new Date(entry.created_at).toLocaleTimeString('en-IN', {
+                      hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata'
+                    })}
                   </td>
                 </tr>
               ))}
@@ -480,7 +462,6 @@ export default function App() {
   const [toast,      setToast]      = useState(null);
   const [activeTab,  setActiveTab]  = useState('queue');
   const [suggestedTokenId, setSuggestedTokenId] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   const showToast = (message, type = 'success') => setToast({ message, type });
 
@@ -600,16 +581,7 @@ export default function App() {
             <div className="topbar__title">{tabTitles[activeTab].title}</div>
             <div className="topbar__subtitle">{tabTitles[activeTab].subtitle}</div>
           </div>
-        <div className="topbar__date" style={{ position: 'relative', cursor: 'pointer' }}>
-          📅 {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
-          <input
-            type="date"
-            value={selectedDate}
-            max={new Date().toISOString().split('T')[0]}
-            onChange={e => { setSelectedDate(e.target.value); setActiveTab('history'); }}
-            style={{ position: 'absolute', opacity: 0, top: 0, left: 0, width: '100%', height: '100%', cursor: 'pointer' }}
-          />
-        </div>
+        <div className="topbar__date">📅 {dateStr}</div>
         </div>
 
         {/* Page Body */}
@@ -643,7 +615,7 @@ export default function App() {
           )}
 
           {activeTab === 'history' && (
-            <HistoryTab selectedDate={selectedDate} onDateChange={setSelectedDate} />
+            <HistoryTab />
           )}
         </div>
       </div>

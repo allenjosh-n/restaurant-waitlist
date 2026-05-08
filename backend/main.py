@@ -376,61 +376,36 @@ class HistoryEntry(BaseModel):
     created_at: datetime
 
 @app.get("/history", response_model=List[HistoryEntry])
-async def get_history(date: Optional[str] = None):
-    """Get seated and cancelled customers for a given date (defaults to today)."""
+async def get_history():
+    """Get today's seated and cancelled customers."""
     async with pool.acquire() as conn:
-        if date:
-            rows = await conn.fetch(
-                """
-                SELECT id, customer_name, phone, party_size, status, created_at
-                FROM tokens
-                WHERE status IN ('seated', 'cancelled')
-                  AND DATE(created_at) = $1::date
-                ORDER BY created_at DESC
-                """,
-                date
-            )
-        else:
-            rows = await conn.fetch(
-                """
-                SELECT id, customer_name, phone, party_size, status, created_at
-                FROM tokens
-                WHERE status IN ('seated', 'cancelled')
-                  AND created_at >= CURRENT_DATE
-                  AND created_at < CURRENT_DATE + INTERVAL '1 day'
-                ORDER BY created_at DESC
-                """
-            )
+        rows = await conn.fetch(
+            """
+            SELECT id, customer_name, phone, party_size, status, created_at
+            FROM tokens
+            WHERE status IN ('seated', 'cancelled')
+              AND DATE(created_at) = CURRENT_DATE
+            ORDER BY created_at DESC
+            """
+        )
         return [HistoryEntry(**dict(r)) for r in rows]
 
 
 # ── Week 3: CSV Export ───────────────────────────────────────────────────────
 
 @app.get("/export/csv")
-async def export_csv(date: Optional[str] = None):
-    """Export token history as a CSV file for a given date (defaults to today)."""
+async def export_csv():
+    """Export today's full token history as a CSV file."""
     async with pool.acquire() as conn:
-        if date:
-            rows = await conn.fetch(
-                """
-                SELECT id, customer_name, phone, party_size, status,
-                       TO_CHAR(created_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD HH24:MI:SS') AS created_at
-                FROM tokens
-                WHERE DATE(created_at) = $1::date
-                ORDER BY created_at ASC
-                """,
-                date
-            )
-        else:
-            rows = await conn.fetch(
-                """
-                SELECT id, customer_name, phone, party_size, status,
-                       TO_CHAR(created_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD HH24:MI:SS') AS created_at
-                FROM tokens
-                WHERE DATE(created_at) = CURRENT_DATE
-                ORDER BY created_at ASC
-                """
-            )
+        rows = await conn.fetch(
+            """
+            SELECT id, customer_name, phone, party_size, status,
+                   TO_CHAR(created_at + INTERVAL '5 hours 30 minutes', 'YYYY-MM-DD HH24:MI:SS') AS created_at
+            FROM tokens
+            WHERE DATE(created_at) = CURRENT_DATE
+            ORDER BY created_at ASC
+            """
+        )
 
     output = io.StringIO()
     writer = csv.writer(output)
