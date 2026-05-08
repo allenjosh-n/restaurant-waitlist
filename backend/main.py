@@ -224,18 +224,18 @@ async def delete_token(token_id: int):
         )
         if result == "DELETE 0":
             raise HTTPException(status_code=404, detail="Token not found")
-        await conn.execute(
-            "DELETE FROM queue WHERE token_id = $1", token_id
-        )
-        # Reorder positions
-        rows = await conn.fetch(
-            "SELECT id FROM queue ORDER BY position"
-        )
-        for idx, row in enumerate(rows, start=1):
-            await conn.execute(
-                "UPDATE queue SET position = $1, estimated_wait_time = $2 WHERE id = $3",
-                idx, idx * 15, row["id"]
-            )
+        await conn.execute("DELETE FROM queue WHERE token_id = $1", token_id)
+        # Reorder positions using a single query
+        await conn.execute("""
+            UPDATE queue SET
+                position = sub.new_pos,
+                estimated_wait_time = sub.new_pos * 15
+            FROM (
+                SELECT id, ROW_NUMBER() OVER (ORDER BY position) AS new_pos
+                FROM queue
+            ) sub
+            WHERE queue.id = sub.id
+        """)
 
 
 @app.patch("/token/{token_id}/seat", response_model=TokenResponse)
@@ -290,13 +290,17 @@ async def cancel_customer(token_id: int):
         if not row:
             raise HTTPException(status_code=404, detail="Token not found")
         await conn.execute("DELETE FROM queue WHERE token_id = $1", token_id)
-        # Reorder positions
-        rows = await conn.fetch("SELECT id FROM queue ORDER BY position")
-        for idx, r in enumerate(rows, start=1):
-            await conn.execute(
-                "UPDATE queue SET position = $1, estimated_wait_time = $2 WHERE id = $3",
-                idx, idx * 15, r["id"]
-            )
+        # Reorder positions using a single query
+        await conn.execute("""
+            UPDATE queue SET
+                position = sub.new_pos,
+                estimated_wait_time = sub.new_pos * 15
+            FROM (
+                SELECT id, ROW_NUMBER() OVER (ORDER BY position) AS new_pos
+                FROM queue
+            ) sub
+            WHERE queue.id = sub.id
+        """)
         return TokenResponse(**dict(row))
 
 class AnalyticsResponse(BaseModel):
