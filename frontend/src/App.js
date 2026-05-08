@@ -374,40 +374,55 @@ function AnalyticsTab({ loading, analytics }) {
 }
 
 // ── History Tab ───────────────────────────────────────────────────────────────
-function HistoryTab() {
+function HistoryTab({ selectedDate, onDateChange }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getHistory()
+    setLoading(true);
+    getHistory(selectedDate)
       .then(({ data }) => setHistory(data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [selectedDate]);
 
   const statusColor = { seated: 'var(--green)', cancelled: 'var(--red)' };
   const statusBg    = { seated: 'var(--green-light)', cancelled: 'var(--red-light)' };
   const statusIcon  = { seated: '✅', cancelled: '❌' };
 
   const handleExport = () => {
-    window.open(exportCSV(), '_blank');
+    window.open(exportCSV(selectedDate), '_blank');
   };
 
-  if (loading) return <div className="loading-state">Loading history…</div>;
+  const displayDate = selectedDate
+    ? new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    : new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
     <div className="card">
       <div className="card__header">
-        <span className="card__title">📋 Today's History</span>
-        <button className="btn btn--outline btn--sm" onClick={handleExport}>
-          ⬇ Export CSV
-        </button>
+        <span className="card__title">📋 History — {displayDate}</span>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <input
+            type="date"
+            className="field__input"
+            style={{ padding: '5px 10px', fontSize: '13px', width: 'auto' }}
+            value={selectedDate || new Date().toISOString().split('T')[0]}
+            max={new Date().toISOString().split('T')[0]}
+            onChange={e => onDateChange(e.target.value)}
+          />
+          <button className="btn btn--outline btn--sm" onClick={handleExport}>
+            ⬇ Export CSV
+          </button>
+        </div>
       </div>
 
-      {history.length === 0 ? (
+      {loading ? (
+        <div className="loading-state">Loading history…</div>
+      ) : history.length === 0 ? (
         <div className="empty-state">
           <span className="empty-state__icon">📭</span>
-          <p>No completed entries yet today.</p>
+          <p>No entries found for this date.</p>
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -465,6 +480,7 @@ export default function App() {
   const [toast,      setToast]      = useState(null);
   const [activeTab,  setActiveTab]  = useState('queue');
   const [suggestedTokenId, setSuggestedTokenId] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
   const showToast = (message, type = 'success') => setToast({ message, type });
 
@@ -584,7 +600,16 @@ export default function App() {
             <div className="topbar__title">{tabTitles[activeTab].title}</div>
             <div className="topbar__subtitle">{tabTitles[activeTab].subtitle}</div>
           </div>
-          <div className="topbar__date">📅 {dateStr}</div>
+        <div className="topbar__date" style={{ position: 'relative', cursor: 'pointer' }}>
+          📅 {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+          <input
+            type="date"
+            value={selectedDate}
+            max={new Date().toISOString().split('T')[0]}
+            onChange={e => { setSelectedDate(e.target.value); setActiveTab('history'); }}
+            style={{ position: 'absolute', opacity: 0, top: 0, left: 0, width: '100%', height: '100%', cursor: 'pointer' }}
+          />
+        </div>
         </div>
 
         {/* Page Body */}
@@ -618,7 +643,7 @@ export default function App() {
           )}
 
           {activeTab === 'history' && (
-            <HistoryTab />
+            <HistoryTab selectedDate={selectedDate} onDateChange={setSelectedDate} />
           )}
         </div>
       </div>
