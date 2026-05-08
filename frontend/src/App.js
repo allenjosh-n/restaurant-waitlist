@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { createToken, getQueue, getTables, deleteToken, seatCustomer, cancelToken, getAnalytics, suggestSeating, getHistory, exportCSV, freeTable } from './api';
+import { createToken, getQueue, getTables, deleteToken, seatCustomer, cancelToken, getAnalytics, suggestSeating, getHistory, exportCSV, freeTable, reserveTable, unreserveTable, freeAllTables } from './api';
 import './App.css';
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -250,7 +250,7 @@ function QueueList({ queue, loading, onDelete, onSeat, onCancel, suggestedTokenI
 }
 
 // ── Tables Grid ───────────────────────────────────────────────────────────────
-function TablesGrid({ tables, loading, onFree }) {
+function TablesGrid({ tables, loading, onFree, onReserve, onUnreserve, onFreeAll }) {
   if (loading) return <div className="loading-state">Loading tables…</div>;
   if (!tables.length) return <div className="empty-state"><p>No table data.</p></div>;
 
@@ -265,10 +265,17 @@ function TablesGrid({ tables, loading, onFree }) {
     <div className="card">
       <div className="card__header">
         <span className="card__title">🪑 Table Status</span>
-        <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-          <span style={{ color: 'var(--green)' }}>● {counts.available} Free</span>
-          <span style={{ color: 'var(--red)' }}>● {counts.occupied} Occupied</span>
-          <span style={{ color: 'var(--yellow)' }}>● {counts.reserved} Reserved</span>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)', marginRight: '8px' }}>
+            <span style={{ color: 'var(--green)' }}>● {counts.available} Free</span>
+            <span style={{ color: 'var(--red)' }}>● {counts.occupied} Occupied</span>
+            <span style={{ color: 'var(--yellow)' }}>● {counts.reserved} Reserved</span>
+          </div>
+          {counts.occupied > 0 && (
+            <button className="btn btn--sm btn--green" onClick={onFreeAll}>
+              🔓 Free All Tables
+            </button>
+          )}
         </div>
       </div>
       <div className="tables-grid">
@@ -279,15 +286,23 @@ function TablesGrid({ tables, loading, onFree }) {
             <div className="table-card__status">
               {statusIcon[t.status]} {t.status}
             </div>
-            {t.status === 'occupied' && (
-              <button
-                className="btn btn--sm btn--green"
-                style={{ marginTop: '8px', width: '100%', fontSize: '11px' }}
-                onClick={() => onFree(t.id)}
-              >
-                Free Table
-              </button>
-            )}
+            <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {t.status === 'occupied' && (
+                <button className="btn btn--sm btn--green" style={{ width: '100%', fontSize: '11px' }} onClick={() => onFree(t.id)}>
+                  Free Table
+                </button>
+              )}
+              {t.status === 'available' && (
+                <button className="btn btn--sm btn--warning" style={{ width: '100%', fontSize: '11px' }} onClick={() => onReserve(t.id)}>
+                  Reserve
+                </button>
+              )}
+              {t.status === 'reserved' && (
+                <button className="btn btn--sm btn--outline" style={{ width: '100%', fontSize: '11px' }} onClick={() => onUnreserve(t.id)}>
+                  Unreserve
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -511,6 +526,30 @@ export default function App() {
     } catch { showToast('Failed to free table', 'error'); }
   };
 
+  const handleReserveTable = async (id) => {
+    try {
+      await reserveTable(id);
+      showToast('Table reserved');
+      fetchTables();
+    } catch { showToast('Failed to reserve table', 'error'); }
+  };
+
+  const handleUnreserveTable = async (id) => {
+    try {
+      await unreserveTable(id);
+      showToast('Table unreserved');
+      fetchTables();
+    } catch { showToast('Failed to unreserve table', 'error'); }
+  };
+
+  const handleFreeAllTables = async () => {
+    try {
+      const { data } = await freeAllTables();
+      showToast(data.message);
+      fetchTables();
+    } catch { showToast('Failed to free all tables', 'error'); }
+  };
+
   const handleSuggest = async () => {
     try {
       const { data } = await suggestSeating();
@@ -571,7 +610,7 @@ export default function App() {
           )}
 
           {activeTab === 'tables' && (
-            <TablesGrid tables={tables} loading={tLoading} onFree={handleFreeTable} />
+            <TablesGrid tables={tables} loading={tLoading} onFree={handleFreeTable} onReserve={handleReserveTable} onUnreserve={handleUnreserveTable} onFreeAll={handleFreeAllTables} />
           )}
 
           {activeTab === 'analytics' && (

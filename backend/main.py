@@ -171,6 +171,50 @@ async def free_table(table_id: int):
         return TableResponse(**dict(row))
 
 
+@app.patch("/tables/{table_id}/reserve", response_model=TableResponse)
+async def reserve_table(table_id: int):
+    """Mark a table as reserved."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE tables SET status = 'reserved'
+            WHERE id = $1 RETURNING id, table_number, capacity, status
+            """,
+            table_id
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Table not found")
+        return TableResponse(**dict(row))
+
+
+@app.patch("/tables/{table_id}/unreserve", response_model=TableResponse)
+async def unreserve_table(table_id: int):
+    """Mark a reserved table as available."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE tables SET status = 'available'
+            WHERE id = $1 AND status = 'reserved'
+            RETURNING id, table_number, capacity, status
+            """,
+            table_id
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Table not found or not reserved")
+        return TableResponse(**dict(row))
+
+
+@app.patch("/tables/free-all")
+async def free_all_tables():
+    """Mark all occupied tables as available."""
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            "UPDATE tables SET status = 'available' WHERE status = 'occupied'"
+        )
+        count = int(result.split()[-1])
+        return {"message": f"{count} table(s) freed successfully"}
+
+
 
 async def delete_token(token_id: int):
     """Remove a token from the waitlist."""
