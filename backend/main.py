@@ -155,7 +155,23 @@ async def get_tables():
         return [TableResponse(**dict(r)) for r in rows]
 
 
-@app.delete("/token/{token_id}", status_code=204)
+@app.patch("/tables/{table_id}/free", response_model=TableResponse)
+async def free_table(table_id: int):
+    """Mark a table as available (customer has left)."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE tables SET status = 'available'
+            WHERE id = $1 RETURNING id, table_number, capacity, status
+            """,
+            table_id
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Table not found")
+        return TableResponse(**dict(row))
+
+
+
 async def delete_token(token_id: int):
     """Remove a token from the waitlist."""
     async with pool.acquire() as conn:

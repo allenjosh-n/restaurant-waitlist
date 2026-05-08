@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { createToken, getQueue, getTables, deleteToken, seatCustomer, cancelToken, getAnalytics, suggestSeating, getHistory, exportCSV } from './api';
+import { createToken, getQueue, getTables, deleteToken, seatCustomer, cancelToken, getAnalytics, suggestSeating, getHistory, exportCSV, freeTable } from './api';
 import './App.css';
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -250,7 +250,7 @@ function QueueList({ queue, loading, onDelete, onSeat, onCancel, suggestedTokenI
 }
 
 // ── Tables Grid ───────────────────────────────────────────────────────────────
-function TablesGrid({ tables, loading }) {
+function TablesGrid({ tables, loading, onFree }) {
   if (loading) return <div className="loading-state">Loading tables…</div>;
   if (!tables.length) return <div className="empty-state"><p>No table data.</p></div>;
 
@@ -279,6 +279,15 @@ function TablesGrid({ tables, loading }) {
             <div className="table-card__status">
               {statusIcon[t.status]} {t.status}
             </div>
+            {t.status === 'occupied' && (
+              <button
+                className="btn btn--sm btn--green"
+                style={{ marginTop: '8px', width: '100%', fontSize: '11px' }}
+                onClick={() => onFree(t.id)}
+              >
+                Free Table
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -494,6 +503,14 @@ export default function App() {
     } catch { showToast('Failed to cancel', 'error'); }
   };
 
+  const handleFreeTable = async (id) => {
+    try {
+      await freeTable(id);
+      showToast('Table is now available');
+      fetchTables();
+    } catch { showToast('Failed to free table', 'error'); }
+  };
+
   const handleSuggest = async () => {
     try {
       const { data } = await suggestSeating();
@@ -554,7 +571,7 @@ export default function App() {
           )}
 
           {activeTab === 'tables' && (
-            <TablesGrid tables={tables} loading={tLoading} />
+            <TablesGrid tables={tables} loading={tLoading} onFree={handleFreeTable} />
           )}
 
           {activeTab === 'analytics' && (

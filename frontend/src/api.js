@@ -16,5 +16,6 @@ export const cancelToken    = (id)   => api.patch(`/token/${id}/cancel`);
 export const getAnalytics   = ()     => api.get('/analytics');
 export const suggestSeating = ()     => api.get('/suggest-seating');
 export const getHistory     = ()     => api.get('/history');
+export const freeTable      = (id)   => api.patch(`/tables/${id}/free`);
 export const exportCSV      = ()     => `${BASE_URL}/export/csv`;
 export default api;
