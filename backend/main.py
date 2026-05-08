@@ -224,18 +224,7 @@ async def delete_token(token_id: int):
         )
         if result == "DELETE 0":
             raise HTTPException(status_code=404, detail="Token not found")
-        await conn.execute("DELETE FROM queue WHERE token_id = $1", token_id)
-        # Reorder positions using a single query
-        await conn.execute("""
-            UPDATE queue SET
-                position = sub.new_pos,
-                estimated_wait_time = sub.new_pos * 15
-            FROM (
-                SELECT id, ROW_NUMBER() OVER (ORDER BY position) AS new_pos
-                FROM queue
-            ) sub
-            WHERE queue.id = sub.id
-        """)
+        # queue entry is auto-deleted via ON DELETE CASCADE
 
 
 @app.patch("/token/{token_id}/seat", response_model=TokenResponse)
