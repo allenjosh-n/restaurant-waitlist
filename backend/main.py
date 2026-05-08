@@ -180,8 +180,16 @@ async def delete_token(token_id: int):
 
 @app.patch("/token/{token_id}/seat", response_model=TokenResponse)
 async def seat_customer(token_id: int):
-    """Mark a customer as seated (removes from queue)."""
+    """Mark a customer as seated (removes from queue, marks a table as occupied)."""
     async with pool.acquire() as conn:
+        # Get token info for party size
+        token_row = await conn.fetchrow(
+            "SELECT id, customer_name, phone, party_size, status, created_at FROM tokens WHERE id = $1",
+            token_id
+        )
+        if not token_row:
+            raise HTTPException(status_code=404, detail="Token not found")
+
         row = await conn.fetchrow(
             """
             UPDATE tokens SET status = 'seated'
@@ -189,9 +197,23 @@ async def seat_customer(token_id: int):
             """,
             token_id
         )
-        if not row:
-            raise HTTPException(status_code=404, detail="Token not found")
         await conn.execute("DELETE FROM queue WHERE token_id = $1", token_id)
+
+        # Mark the best-fit available table as occupied
+        table = await conn.fetchrow(
+            """
+            SELECT id FROM tables
+            WHERE status = 'available' AND capacity >= $1
+            ORDER BY capacity ASC LIMIT 1
+            """,
+            token_row["party_size"]
+        )
+        if table:
+            await conn.execute(
+                "UPDATE tables SET status = 'occupied' WHERE id = $1",
+                table["id"]
+            )
+
         return TokenResponse(**dict(row))
 
 @app.patch("/token/{token_id}/cancel", response_model=TokenResponse)
