@@ -215,7 +215,7 @@ async def free_all_tables():
         return {"message": f"{count} table(s) freed successfully"}
 
 
-
+@app.delete("/token/{token_id}", status_code=204)
 async def delete_token(token_id: int):
     """Remove a token from the waitlist."""
     async with pool.acquire() as conn:
