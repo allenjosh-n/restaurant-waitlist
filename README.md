@@ -1,25 +1,22 @@
 # 🍴 Restaurant Waitlist Manager
 
-A full-stack restaurant waitlist management system built with **FastAPI + PostgreSQL (Supabase) + React**.
+A full-stack restaurant waitlist management system — add walk-in customers to a live queue, manage table statuses, seat or mark no-shows, and track daily analytics, all from a single dashboard.
 
-> **PRJ-059** · Allen Joshua N · Reg No: 411723104005 · PSVPEC CSE
+**Live Demo → [restaurant-waitlist-iota.vercel.app](https://restaurant-waitlist-iota.vercel.app)**  
+**API Docs → [restaurant-waitlist-nv21.onrender.com/docs](https://restaurant-waitlist-nv21.onrender.com/docs)**
 
 ---
 
 ## Features
 
-| Feature | Status |
-|---|---|
-| Token generation with validation | ✅ |
-| Live queue tracking (auto-refresh 15s) | ✅ |
-| Estimated wait time calculation | ✅ |
-| Seat customer / No-show handling | ✅ |
-| Smart seating suggestion | ✅ |
-| Table status grid | ✅ |
-| Analytics dashboard | ✅ |
-| History log (seated + cancelled) | ✅ |
-| CSV export of daily report | ✅ |
-| Queue filter (name / phone / party size) | ✅ |
+- **Waitlist tokens** — add customers with name, phone, and party size; auto-assigns queue position and estimated wait time
+- **Live queue** — real-time view with 15-second auto-refresh; search by name, phone, or party size
+- **Seat / No-show / Remove** — one-click actions that update the queue and free up tables automatically
+- **Smart seating suggestion** — finds the best available table for the next fitting party
+- **Table management** — mark tables as available, occupied, or reserved; free all occupied tables at once
+- **Analytics dashboard** — today's totals (waiting, seated, no-shows) with a seating rate progress bar
+- **History log** — filterable view of today's seated and cancelled customers
+- **CSV export** — download the daily report as a timestamped CSV file
 
 ---
 
@@ -27,11 +24,11 @@ A full-stack restaurant waitlist management system built with **FastAPI + Postgr
 
 | Layer | Technology |
 |---|---|
-| Backend | FastAPI (Python 3.11) |
+| Backend | FastAPI (Python 3.11) + asyncpg |
 | Database | PostgreSQL via Supabase |
 | Frontend | React 18 + Axios |
 | Styling | Custom CSS (Inter + Plus Jakarta Sans) |
-| Testing | pytest + httpx (async) |
+| Hosting | Render (API) + Vercel (Frontend) |
 
 ---
 
@@ -40,73 +37,71 @@ A full-stack restaurant waitlist management system built with **FastAPI + Postgr
 ```
 restaurant-waitlist/
 ├── backend/
-│   ├── main.py            # FastAPI app — all routes
-│   ├── schema.sql         # DB schema + sample data
-│   ├── requirements.txt
-│   ├── .env.example
+│   ├── main.py            # FastAPI application — all routes and logic
+│   ├── schema.sql         # Database schema + seed data (run once in Supabase)
+│   ├── requirements.txt   # Python dependencies
+│   ├── .env.example       # Environment variable template
 │   └── tests/
-│       └── test_api.py    # Full test suite (Week 1–3)
-└── frontend/
-    ├── public/
-    │   └── index.html
-    └── src/
-        ├── App.js         # Main dashboard UI
-        ├── App.css        # Component styles
-        ├── api.js         # Axios API calls
-        ├── index.css      # Global styles + CSS variables
-        └── index.js
+│       └── test_api.py    # Full async test suite (pytest + httpx)
+├── frontend/
+│   ├── public/
+│   │   └── index.html
+│   └── src/
+│       ├── App.js         # Main dashboard — all UI components
+│       ├── App.css        # Component styles
+│       ├── api.js         # Axios API client
+│       ├── index.css      # Global styles and CSS variables
+│       └── index.js       # React entry point
+├── render.yaml            # Render deployment config
+└── .gitignore
 ```
 
 ---
 
-## Setup Instructions
+## Getting Started
 
 ### Prerequisites
 
-| Tool | Version |
-|---|---|
-| Python | 3.11 |
-| Node.js | 18+ |
-| Supabase account | free tier works |
+- Python 3.11
+- Node.js 18+
+- A [Supabase](https://supabase.com) account (free tier works)
 
 ---
 
-### 1. Database Setup (Supabase)
+### 1. Database Setup
 
-1. Create a project at [supabase.com](https://supabase.com)
-2. Go to **SQL Editor** → paste contents of `backend/schema.sql` → **Run**
-3. Go to **Settings → Database → Connection string (URI)** → copy the direct connection string
+1. Create a new project at [supabase.com](https://supabase.com)
+2. Open the **SQL Editor**, paste the contents of `backend/schema.sql`, and click **Run**
+3. Go to **Settings → Database → Connection string (URI)** and copy the direct connection URI
 
 ---
 
-### 2. Backend Setup
+### 2. Backend
 
 ```bash
-# Create virtual environment with Python 3.11
+# Create a Python 3.11 virtual environment
 py -3.11 -m venv venv311
-source venv311/Scripts/activate   # Windows Git Bash
-# or: venv311\Scripts\activate    # Windows CMD
+venv311\Scripts\activate        # Windows CMD
+# source venv311/Scripts/activate  # Windows Git Bash
 
 # Install dependencies
 cd backend
 pip install -r requirements.txt
 
-# Configure environment
-cp .env.example .env
-# Edit .env — set DATABASE_URL to your Supabase connection string
+# Set up environment variables
+copy .env.example .env
+# Open .env and set DATABASE_URL to your Supabase connection string
 
-# Start server
+# Start the API server
 uvicorn main:app --reload
 ```
 
-Backend runs at: **http://localhost:8000**  
-API docs (Swagger): **http://localhost:8000/docs**
-
-> **Note:** If on college WiFi, use a mobile hotspot — port 5432 is often blocked on institutional networks.
+The API runs at `http://localhost:8000`  
+Interactive docs at `http://localhost:8000/docs`
 
 ---
 
-### 3. Frontend Setup
+### 3. Frontend
 
 ```bash
 cd frontend
@@ -114,7 +109,9 @@ npm install
 npm start
 ```
 
-App runs at: **http://localhost:3000**
+The app runs at `http://localhost:3000`
+
+> The frontend auto-detects the environment — it uses `localhost:8000` in development and the Render URL in production. To override, set `REACT_APP_API_URL` in a `.env.local` file.
 
 ---
 
@@ -123,14 +120,18 @@ App runs at: **http://localhost:3000**
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/` | Health check |
-| `POST` | `/token` | Create waitlist token |
-| `GET` | `/queue` | Live queue (waiting only) |
-| `GET` | `/tables` | All table statuses |
-| `DELETE` | `/token/{id}` | Remove token |
-| `PATCH` | `/token/{id}/seat` | Mark as seated |
-| `PATCH` | `/token/{id}/cancel` | Mark as no-show |
+| `POST` | `/token` | Add a customer to the waitlist |
+| `GET` | `/queue` | Fetch the live queue (waiting only) |
+| `DELETE` | `/token/{id}` | Remove a token |
+| `PATCH` | `/token/{id}/seat` | Mark customer as seated |
+| `PATCH` | `/token/{id}/cancel` | Mark customer as no-show |
+| `GET` | `/tables` | Fetch all table statuses |
+| `PATCH` | `/tables/{id}/free` | Mark a table as available |
+| `PATCH` | `/tables/{id}/reserve` | Mark a table as reserved |
+| `PATCH` | `/tables/{id}/unreserve` | Unreserve a table |
+| `PATCH` | `/tables/free-all` | Free all occupied tables |
 | `GET` | `/analytics` | Today's stats |
-| `GET` | `/suggest-seating` | Smart seating suggestion |
+| `GET` | `/suggest-seating` | Smart seating recommendation |
 | `GET` | `/history` | Today's seated + cancelled log |
 | `GET` | `/export/csv` | Download daily report as CSV |
 
@@ -144,11 +145,10 @@ App runs at: **http://localhost:3000**
 }
 ```
 
-### Validation Rules
-
-- `customer_name`: required, minimum 2 characters
-- `phone`: required, minimum 10 digits
-- `party_size`: minimum 1, maximum 20
+**Validation rules:**
+- `customer_name` — required, minimum 2 characters
+- `phone` — required, minimum 10 digits
+- `party_size` — minimum 1, maximum 20
 
 ---
 
@@ -156,7 +156,9 @@ App runs at: **http://localhost:3000**
 
 | Variable | Description | Example |
 |---|---|---|
-| `DATABASE_URL` | Supabase PostgreSQL URI | `postgresql://postgres:pass@db.xxx.supabase.co:5432/postgres` |
+| `DATABASE_URL` | Supabase PostgreSQL connection URI | `postgresql://postgres:pass@db.xxx.supabase.co:5432/postgres` |
+
+Copy `backend/.env.example` to `backend/.env` and fill in the value. Never commit the `.env` file.
 
 ---
 
@@ -168,51 +170,28 @@ pip install pytest httpx pytest-asyncio
 pytest tests/ -v
 ```
 
-Test coverage includes:
-- Token creation (valid + invalid inputs)
-- Queue fetch and field validation
-- Table listing
-- Delete, seat, cancel flows
-- Analytics endpoint
-- Suggest-seating logic
-- History endpoint (Week 3)
-- CSV export (Week 3)
+The test suite covers token creation, queue operations, table management, seat/cancel/delete flows, analytics, smart seating suggestions, history, and CSV export.
 
 ---
 
-## Weekly Deliverables
+## Deployment
 
-### Week 1 ✅
-- PostgreSQL schema (`tokens`, `tables`, `queue`)
-- Sample data (10 tables, 7 customers)
-- FastAPI backend with core CRUD routes
-- React dashboard with queue + tables view
-- Form validation (name + phone)
-- Auto-refresh every 15 seconds
+### Backend (Render)
 
-### Week 2 ✅
-- `/analytics` endpoint — today's stats
-- `/cancel` — no-show handling with queue reorder
-- `/suggest-seating` — smart helper (best table + best fit party)
-- Queue filter by name, phone, party size
-- Stats bar (in queue, tables free, occupied, max wait)
-- Extended test suite
+The `render.yaml` at the root configures the backend automatically. Connect your GitHub repo in the Render dashboard and add `DATABASE_URL` as an environment variable in the service settings.
 
-### Week 3 ✅
-- Complete UI redesign — light theme, sidebar nav, two-column layout
-- `/history` endpoint — today's seated + cancelled log
-- `/export/csv` — download daily report as CSV
-- History tab in frontend with table view
-- CSV export button
-- Seating rate progress bar in analytics
-- Updated README + full test suite
+### Frontend (Vercel)
+
+Import the repository in the Vercel dashboard. Set the root directory to `frontend` and add:
+
+```
+REACT_APP_API_URL=https://your-render-service.onrender.com
+```
+
+Vercel will build and deploy on every push to `main`.
 
 ---
 
-## Sample Data
+## License
 
-The schema includes:
-- **10 dining tables** (2–8 seat capacity, mixed statuses)
-- **7 sample customers** (5 waiting, 2 seated)
-
-Run `backend/schema.sql` to populate your database.
+MIT
